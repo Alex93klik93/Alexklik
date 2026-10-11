@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+	    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-select=no">
+    <title>Рандомайзер - Жеребьевка Команд</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #1e1e24;
+            color: #fff;
+            margin: 0;
+            padding: 40px 20px;
+        }
+        
+        /* Главный контейнер-сетка */
+        .game-container {
+            display: grid;
+            grid-template-columns: 280px 380px 280px;
+            gap: 30px;
+            max-width: 1050px;
+            margin: 0 auto;
+            justify-content: center;
+            align-items: start;
+        }
+
+        .roulette-box {
+            background: #2a2a35;
+            padding: 20px;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            border: 2px solid #ffc107;
+            text-align: center;
+        }
+
+        /* Стили панелей команд */
+        .team-box {
+            background: #23232c;
+            border: 2px dashed #555;
+            border-radius: 16px;
+            padding: 20px;
+            min-height: 480px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            transition: all 0.3s ease;
+        }
+
+        /* Подсветка активной команды, которая ждет дроп */
+        .team-box.active {
+            border-color: #ffc107;
+            box-shadow: 0 0 15px rgba(255, 193, 7, 0.4);
+            background: #2d2d3a;
+        }
+
+        .team-box h3 {
+            margin-top: 0;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #444;
+            font-size: 20px;
+        }
+
+        .team-left h3 { color: #4dadff; }
+        .team-right h3 { color: #ff5c5c; }
+
+        /* Список выпавших участников */
+        .team-slots {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .slot {
+            min-height: 60px; /* Было height, меняем на min-height, чтобы плашка росла вниз */
+            background: #1a1a20;
+            border-radius: 8px;
+            border: 1px solid #333;
+            display: flex;
+            align-items: flex-start; /* Выравнивание по верхнему краю */
+            padding: 8px 10px;
+            box-sizing: border-box;
+            font-weight: bold;
+            text-align: left; /* Текст внутри списка влево */
+        }
+
+        .slot img {
+            width: 44px;
+            height: 44px;
+            object-fit: cover;
+            border-radius: 4px;
+            margin-right: 15px;
+            flex-shrink: 0; /* Чтобы картинка не сжималась */
+        }
+
+        /* Стили для интерактивного спойлера */
+        .slot details {
+            width: 100%;
+            cursor: pointer;
+        }
+        .slot summary {
+            font-size: 16px;
+            outline: none;
+            user-select: none;
+            padding-bottom: 2px;
+        }
+        .slot details p {
+            margin: 5px 0 0 0;
+            font-size: 13px;
+            color: #bbb;
+            font-weight: normal;
+            line-height: 1.4;
+        }
+
+        .window {
+            width: 330px;
+            height: 330px;
+            margin: 0 auto 25px;
+            border-radius: 12px;
+            overflow: hidden;
+            background: #111;
+            position: relative;
+            border: 4px solid #3e3e4f;
+        }
+        .window::before, .window::after {
+            content: "";
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            border: 10px solid transparent;
+            z-index: 10;
+        }
+        .window::before { left: 0; border-left-color: #ffc107; }
+        .window::after { right: 0; border-right-color: #ffc107; }
+
+        .tape {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            transition: transform 3.5s cubic-bezier(0.15, 0.85, 0.35, 1.02);
+            transform: translateY(0px);
+        }
+        .tape img {
+            width: 330px;
+            height: 330px;
+            object-fit: cover;
+            box-sizing: border-box;
+            border-bottom: 2px solid #2a2a35;
+        }
+        button {
+            background: linear-gradient(135deg, #ffc107, #ff9800);
+            color: #000;
+            border: none;
+            padding: 15px 40px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 30px;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(255, 152, 0, 0.4);
+            transition: 0.2s;
+            width: 100%;
+        }
+        button:hover { transform: translateY(-2px); box-shadow: 0 7px 20px rgba(255, 152, 0, 0.6); }
+        button:disabled { background: #555; color: #888; cursor: not-allowed; box-shadow: none; transform: none; }
+        
+        .status-text {
+            margin-top: 15px;
+            font-size: 14px;
+            color: #aaa;
+        }
+		@media (max-width: 900px) {
+            body {
+                padding: 15px 10px;
+                margin-top: 10px;
+            }
+
+            /* Перестраиваем сетку: колонки встают друг под друга */
+            .game-container {
+                grid-template-columns: 1fr; /* Одна колонка на весь экран */
+                gap: 20px;
+                max-width: 100%;
+            }
+
+            /* Меняем порядок отображения на мобилках */
+            .roulette-box {
+                grid-row: 1; /* Рулетка ВСЕГДА сверху */
+            }
+            .team-left {
+                grid-row: 2; /* Команда №2 под рулеткой */
+            }
+            .team-right {
+                grid-row: 3; /* Команда №1 в самом низу */
+            }
+
+            /* Делаем рулетку чуть компактнее под экраны телефонов */
+            .window, .tape, .tape img {
+                width: 290px;
+                height: 290px;
+            }
+
+            .team-box {
+                min-height: auto; /* На смартфонах блоки растут по контенту */
+                padding: 15px;
+            }
+        }
+
+        /* 2. ЗАЩИТА ОТ СЛУЧАЙНЫХ ЗУМОВ И СЛУЧАЙНЫХ НАЖАТИЙ НА СМАРТФОНЕ */
+        button {
+            touch-action: manipulation; /* Убирает задержку клика в 300мс на Android */
+            -webkit-tap-highlight-color: transparent; /* Убирает синюю рамку при тапе */
+        }
+
+        .slot details summary {
+            -webkit-tap-highlight-color: transparent;
+            padding: 8px 0; /* Увеличиваем область тапа для пальца */
+        }
+    </style>
+</head>
+<body>
+
+<div class="game-container">
+    <!-- ЛЕВАЯ КОЛОНКА: Команда №2 -->
+    <div class="team-box team-left" id="team2-box">
+        <h3>Команда №2 (<span id="count2">0</span>/5)</h3>
+        <div class="team-slots" id="team2-slots"></div>
+    </div>
+
+    <!-- ЦЕНТРАЛЬНАЯ КОЛОНКА: Рулетка -->
+    <div class="roulette-box">
+        <h2 id="round-title">Рандомизатор</h2>
+        <div class="window">
+            <div class="tape" id="image-tape">
+                <img src="img/main.jpg" alt="Главная">
+            </div>
+        </div>
+        <button id="spin-btn" onclick="startSpinning()">Крутить</button>
+        <div class="status-text" id="status-message">Ход: Команда №1 (Справа)</div>
+    </div>
+
+    <!-- ПРАВАЯ КОЛОНКА: Команда №1 -->
+    <div class="team-box team-right active" id="team1-box">
+        <h3>Команда №1 (<span id="count1">0</span>/5)</h3>
+        <div class="team-slots" id="team1-slots"></div>
+    </div>
+</div>
+
+<script>
+    const TOTAL_IMAGES = 40; 
+
+    const CHARACTER_DATA = {
+        1: { name: "Анаконда", desc: "Самая большая змея в мире. Обитает в тропиках Южной Америки." },
+        2: { name: "Горилла", desc: "Крупнейший представитель отряда приматов. Очень сильное и умное животное." },
+        3: { name: "Лев", desc: "Царь зверей. Крупный хищник семейства кошачьих." }
+        // и так далее до 40...
+    };
+
+    const tape = document.getElementById('image-tape');
+    const btn = document.getElementById('spin-btn');
+    const statusMsg = document.getElementById('status-message');
+    
+    let availableImages = [];
+    let targetGlobalIndex = 0;
+    let team1 = [];
+    let team2 = [];
+    let currentTurn = 'team1'; 
+
+    // Динамический метод: считываем высоту окна прямо из CSS в момент запроса
+    function getActualHeight() {
+        const windowEl = document.querySelector('.window');
+        return windowEl ? windowEl.clientHeight : 330;
+    }
+
+    // Исправление бага при ручном изменении размера окна:
+    // Корректируем положение ленты на лету, чтобы она не улетала в черный экран
+    window.addEventListener('resize', () => {
+        tape.style.transition = 'none';
+        tape.style.transform = `translateY(${-(targetGlobalIndex * getActualHeight())}px)`;
+    });
+
+    function resetPool() {
+        availableImages = [];
+        for (let i = 1; i <= TOTAL_IMAGES; i++) {
+            availableImages.push(i);
+        }
+    }
+    resetPool();
+
+    function buildTape() {
+        tape.innerHTML = '<img src="img/main.jpg" alt="Главная">';
+        for (let round = 0; round < 4; round++) {
+            for (let i = 1; i <= TOTAL_IMAGES; i++) {
+                const img = document.createElement('img');
+                img.src = `img/${i}.jpg`;
+                tape.appendChild(img);
+            }
+        }
+    }
+    buildTape();
+
+    function updateVisualTurns() {
+        document.getElementById('team1-box').classList.remove('active');
+        document.getElementById('team2-box').classList.remove('active');
+        
+        if (team1.length >= 5 && team2.length >= 5) {
+            statusMsg.innerText = "Формирование команд завершено!";
+            btn.disabled = true;
+            btn.innerText = "Готово";
+            return;
+        }
+
+        if (currentTurn === 'team1') {
+            document.getElementById('team1-box').classList.add('active');
+            statusMsg.innerText = "Ход: Команда №1 (Справа)";
+        } else {
+            document.getElementById('team2-box').classList.add('active');
+            statusMsg.innerText = "Ход: Команда №2 (Слева)";
+        }
+    }
+
+    function startSpinning() {
+        if (team1.length >= 5 && team2.length >= 5) return;
+
+        btn.disabled = true;
+
+        const finalPoolIndex = Math.floor(Math.random() * availableImages.length);
+        const finalImageNumber = availableImages[finalPoolIndex];
+
+        const currentSrc = tape.getElementsByTagName('img')[targetGlobalIndex || 0]?.getAttribute('src');
+        
+        tape.style.transition = 'none';
+        
+        let resetIndex = 0;
+        if (currentSrc && currentSrc !== 'img/main.jpg') {
+            for (let i = 1; i <= TOTAL_IMAGES; i++) {
+                if (`img/${i}.jpg` === currentSrc) {
+                    resetIndex = i;
+                    break;
+                }
+            }
+        }
+        
+        // Сброс учитыв факт высоты из CSS
+        const imgH = getActualHeight();
+        tape.style.transform = `translateY(${-(resetIndex * imgH)}px)`;
+        targetGlobalIndex = resetIndex;
+
+        setTimeout(() => {
+            tape.style.transition = 'transform 3.5s cubic-bezier(0.15, 0.85, 0.35, 1.02)';
+            
+            const targetRound = 3; 
+            targetGlobalIndex = ((targetRound - 1) * TOTAL_IMAGES) + finalImageNumber;
+
+            // Сдвиг с учетом фактич высоты из CSS
+            tape.style.transform = `translateY(${-(targetGlobalIndex * getActualHeight())}px)`;
+            
+            availableImages.splice(finalPoolIndex, 1);
+        }, 50);
+
+        setTimeout(() => {
+            if (currentTurn === 'team1') {
+                team1.push(finalImageNumber);
+                addSlotToUI('team1-slots', finalImageNumber, team1.length);
+                document.getElementById('count1').innerText = team1.length;
+                
+                if (team2.length < 5) {
+                    currentTurn = 'team2';
+                }
+            } else {
+                team2.push(finalImageNumber);
+                addSlotToUI('team2-slots', finalImageNumber, team2.length);
+                document.getElementById('count2').innerText = team2.length;
+                
+                if (team1.length < 5) {
+                    currentTurn = 'team1';
+                }
+            }
+
+            updateVisualTurns();
+
+            if (!(team1.length >= 5 && team2.length >= 5)) {
+                btn.disabled = false;
+            }
+
+            if (availableImages.length === 0 && !(team1.length >= 5 && team2.length >= 5)) {
+                alert("Все картинки показаны! Начинаем новый круг.");
+                resetPool();
+            }
+        }, 3600);
+    }
+
+    function addSlotToUI(targetId, imgNumber, index) {
+        const container = document.getElementById(targetId);
+        const slot = document.createElement('div');
+        slot.className = 'slot';
+        
+        const charName = CHARACTER_DATA[imgNumber]?.name || `NameNotSpec #${imgNumber}`;
+        const charDesc = CHARACTER_DATA[imgNumber]?.desc || "Описание пока не добавлено.";
+
+        slot.innerHTML = `
+            <img src="img/${imgNumber}.jpg" alt="Участник">
+            <details>
+                <summary>${charName}</summary>
+                <p>${charDesc}</p>
+            </details>
+        `;
+        container.appendChild(slot);
+    }
+</script>
+
+</body>
+</html>
