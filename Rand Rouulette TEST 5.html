@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Рандомайзер - Жеребьевка Команд</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #1e1e24;
+            color: #fff;
+            margin: 0;
+            padding: 40px 20px;
+        }
+        
+        /* Главный контейнер-сетка */
+        .game-container {
+            display: grid;
+            grid-template-columns: 280px 380px 280px;
+            gap: 30px;
+            max-width: 1050px;
+            margin: 0 auto;
+            justify-content: center;
+            align-items: start;
+        }
+
+        .roulette-box {
+            background: #2a2a35;
+            padding: 20px;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            border: 2px solid #ffc107;
+            text-align: center;
+        }
+
+        /* Стили панелей команд */
+        .team-box {
+            background: #23232c;
+            border: 2px dashed #555;
+            border-radius: 16px;
+            padding: 20px;
+            min-height: 480px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            transition: all 0.3s ease;
+        }
+
+        /* Подсветка активной команды, которая ждет дроп */
+        .team-box.active {
+            border-color: #ffc107;
+            box-shadow: 0 0 15px rgba(255, 193, 7, 0.4);
+            background: #2d2d3a;
+        }
+
+        .team-box h3 {
+            margin-top: 0;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #444;
+            font-size: 20px;
+        }
+
+        .team-left h3 { color: #4dadff; }
+        .team-right h3 { color: #ff5c5c; }
+
+        /* Список выпавших участников */
+        .team-slots {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .slot {
+            height: 60px;
+            background: #1a1a20;
+            border-radius: 8px;
+            border: 1px solid #333;
+            display: flex;
+            align-items: center;
+            padding: 5px 10px;
+            box-sizing: border-box;
+            font-weight: bold;
+        }
+
+        .slot img {
+            width: 50px;
+            height: 50px;
+            object-fit: cover;
+            border-radius: 4px;
+            margin-right: 15px;
+        }
+
+        .window {
+            width: 330px;
+            height: 330px;
+            margin: 0 auto 25px;
+            border-radius: 12px;
+            overflow: hidden;
+            background: #111;
+            position: relative;
+            border: 4px solid #3e3e4f;
+        }
+        .window::before, .window::after {
+            content: "";
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            border: 10px solid transparent;
+            z-index: 10;
+        }
+        .window::before { left: 0; border-left-color: #ffc107; }
+        .window::after { right: 0; border-right-color: #ffc107; }
+
+        .tape {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            transition: transform 3.5s cubic-bezier(0.15, 0.85, 0.35, 1.02);
+            transform: translateY(0px);
+        }
+        .tape img {
+            width: 330px;
+            height: 330px;
+            object-fit: cover;
+            box-sizing: border-box;
+            border-bottom: 2px solid #2a2a35;
+        }
+        button {
+            background: linear-gradient(135deg, #ffc107, #ff9800);
+            color: #000;
+            border: none;
+            padding: 15px 40px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 30px;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(255, 152, 0, 0.4);
+            transition: 0.2s;
+            width: 100%;
+        }
+        button:hover { transform: translateY(-2px); box-shadow: 0 7px 20px rgba(255, 152, 0, 0.6); }
+        button:disabled { background: #555; color: #888; cursor: not-allowed; box-shadow: none; transform: none; }
+        
+        .status-text {
+            margin-top: 15px;
+            font-size: 14px;
+            color: #aaa;
+        }
+    </style>
+</head>
+<body>
+
+<div class="game-container">
+    <!-- ЛЕВАЯ КОЛОНКА: Команда №2 -->
+    <div class="team-box team-left" id="team2-box">
+        <h3>Команда №2 (<span id="count2">0</span>/5)</h3>
+        <div class="team-slots" id="team2-slots"></div>
+    </div>
+
+    <!-- ЦЕНТРАЛЬНАЯ КОЛОНКА: Рулетка -->
+    <div class="roulette-box">
+        <h2 id="round-title">Рандомизатор</h2>
+        <div class="window">
+            <div class="tape" id="image-tape">
+                <img src="img/main.jpg" alt="Главная">
+            </div>
+        </div>
+        <button id="spin-btn" onclick="startSpinning()">Крутить</button>
+        <div class="status-text" id="status-message">Ход: Команда №1 (Справа)</div>
+    </div>
+
+    <!-- ПРАВАЯ КОЛОНКА: Команда №1 -->
+    <div class="team-box team-right active" id="team1-box">
+        <h3>Команда №1 (<span id="count1">0</span>/5)</h3>
+        <div class="team-slots" id="team1-slots"></div>
+    </div>
+</div>
+
+<script>
+    const TOTAL_IMAGES = 40; 
+    const IMG_HEIGHT = 330; // Чуть уменьшили под обновленную сетку
+
+    const tape = document.getElementById('image-tape');
+    const btn = document.getElementById('spin-btn');
+    const statusMsg = document.getElementById('status-message');
+    
+    let availableImages = [];
+    let targetGlobalIndex = 0;
+
+    // Списки участников в командах
+    let team1 = [];
+    let team2 = [];
+    
+    // Переменная определяет очередь: 'team1' (справа) или 'team2' (слева)
+    let currentTurn = 'team1'; 
+
+    function resetPool() {
+        availableImages = [];
+        for (let i = 1; i <= TOTAL_IMAGES; i++) {
+            availableImages.push(i);
+        }
+    }
+    resetPool();
+
+    function buildTape() {
+        tape.innerHTML = '<img src="img/main.jpg" alt="Главная">';
+        for (let round = 0; round < 4; round++) {
+            for (let i = 1; i <= TOTAL_IMAGES; i++) {
+                const img = document.createElement('img');
+                img.src = `img/${i}.jpg`;
+                tape.appendChild(img);
+            }
+        }
+    }
+    buildTape();
+
+    // Обновление подсветки активных блоков команд в интерфейсе
+    function updateVisualTurns() {
+        document.getElementById('team1-box').classList.remove('active');
+        document.getElementById('team2-box').classList.remove('active');
+        
+        if (team1.length >= 5 && team2.length >= 5) {
+            statusMsg.innerText = "Формирование команд завершено!";
+            btn.disabled = true;
+            btn.innerText = "Готово";
+            return;
+        }
+
+        if (currentTurn === 'team1') {
+            document.getElementById('team1-box').classList.add('active');
+            statusMsg.innerText = "Ход: Команда №1 (Справа)";
+        } else {
+            document.getElementById('team2-box').classList.add('active');
+            statusMsg.innerText = "Ход: Команда №2 (Слева)";
+        }
+    }
+
+    function startSpinning() {
+        // Проверка на случай завершения
+        if (team1.length >= 5 && team2.length >= 5) return;
+
+        btn.disabled = true;
+
+        const finalPoolIndex = Math.floor(Math.random() * availableImages.length);
+        const finalImageNumber = availableImages[finalPoolIndex];
+
+        const currentSrc = tape.getElementsByTagName('img')[targetGlobalIndex || 0]?.getAttribute('src');
+        
+        tape.style.transition = 'none';
+        
+        let resetIndex = 0;
+        if (currentSrc && currentSrc !== 'img/main.jpg') {
+            for (let i = 1; i <= TOTAL_IMAGES; i++) {
+                if (`img/${i}.jpg` === currentSrc) {
+                    resetIndex = i;
+                    break;
+                }
+            }
+        }
+        
+        tape.style.transform = `translateY(${-(resetIndex * IMG_HEIGHT)}px)`;
+
+        setTimeout(() => {
+            tape.style.transition = 'transform 3.5s cubic-bezier(0.15, 0.85, 0.35, 1.02)';
+            
+            const targetRound = 3; 
+            targetGlobalIndex = ((targetRound - 1) * TOTAL_IMAGES) + finalImageNumber;
+
+            tape.style.transform = `translateY(${-(targetGlobalIndex * IMG_HEIGHT)}px)`;
+            
+            availableImages.splice(finalPoolIndex, 1);
+        }, 50);
+
+        // Ждем окончания прокрутки
+        setTimeout(() => {
+            // Распределяем выпавшего персонажа
+            if (currentTurn === 'team1') {
+                team1.push(finalImageNumber);
+                addSlotToUI('team1-slots', finalImageNumber, team1.length);
+                document.getElementById('count1').innerText = team1.length;
+                
+                // Меняем ход на команду 2, если у неё еще нет 5 человек
+                if (team2.length < 5) {
+                    currentTurn = 'team2';
+                }
+            } else {
+                team2.push(finalImageNumber);
+                addSlotToUI('team2-slots', finalImageNumber, team2.length);
+                document.getElementById('count2').innerText = team2.length;
+                
+                // Меняем ход на команду 1, если у неё еще нет 5 человек
+                if (team1.length < 5) {
+                    currentTurn = 'team1';
+                }
+            }
+
+            // Обновляем визуальное состояние очередей
+            updateVisualTurns();
+
+            // Если распределение не закончено, возвращаем кнопку
+            if (!(team1.length >= 5 && team2.length >= 5)) {
+                btn.disabled = false;
+            }
+
+            if (availableImages.length === 0 && !(team1.length >= 5 && team2.length >= 5)) {
+                alert("Все картинки показаны! Начинаем новый круг.");
+                resetPool();
+            }
+        }, 3600);
+    }
+
+    // Вспомогательная функция для добавления плашки в список команды
+    function addSlotToUI(targetId, imgNumber, index) {
+        const container = document.getElementById(targetId);
+        const slot = document.createElement('div');
+        slot.className = 'slot';
+        slot.innerHTML = `<img src="img/${imgNumber}.jpg" alt="Участник"> <span>Выбор #${imgNumber}</span>`;
+        container.appendChild(slot);
+    }
+</script>
+</body>
+</html>
