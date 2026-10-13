@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-select=no">
+    <title>Рандомайзер - Жеребьевка Команд</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #1e1e24;
+            color: #fff;
+            margin: 0;
+            padding: 40px 20px;
+        }
+        
+        .game-container {
+            display: grid;
+            grid-template-columns: 280px 380px 280px;
+            gap: 30px;
+            max-width: 1050px;
+            margin: 0 auto;
+            justify-content: center;
+            align-items: start;
+        }
+
+        .roulette-box {
+            background: #2a2a35;
+            padding: 20px;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+            border: 2px solid #ffc107;
+            text-align: center;
+        }
+		        #round-title {
+            margin-top: 5px; /* Минимальный отступ сверху для заголовка */
+            margin-bottom: 15px; /* Отступ между заголовком и окном рулетки */
+        }
+
+        .team-box {
+            background: #23232c;
+            border: 2px dashed #555;
+            border-radius: 16px;
+            padding: 20px;
+            min-height: 480px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+            transition: all 0.3s ease;
+        }
+
+        .team-box.active {
+            border-color: #ffc107;
+            box-shadow: 0 0 15px rgba(255, 193, 7, 0.4);
+            background: #2d2d3a;
+        }
+
+        .team-box h3 {
+            margin-top: 0;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #444;
+            font-size: 20px;
+        }
+
+        .team-left h3 { color: #4dadff; }
+        .team-right h3 { color: #ff5c5c; }
+
+        .team-slots {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .slot {
+            min-height: 60px;
+            background: #1a1a20;
+            border-radius: 8px;
+            border: 1px solid #333;
+            display: flex;
+            align-items: flex-start;
+            padding: 8px 10px;
+            box-sizing: border-box;
+            font-weight: bold;
+            text-align: left;
+        }
+
+        .slot img {
+            width: 44px;
+            height: 44px;
+            object-fit: cover;
+            border-radius: 4px;
+            margin-right: 15px;
+            flex-shrink: 0;
+        }
+
+        .slot details {
+            width: 100%;
+            cursor: pointer;
+        }
+        .slot summary {
+            font-size: 16px;
+            outline: none;
+            user-select: none;
+            padding-bottom: 2px;
+        }
+        .slot details p {
+            margin: 5px 0 0 0;
+            font-size: 13px;
+            color: #bbb;
+            font-weight: normal;
+            line-height: 1.4;
+        }
+
+        /* ИСПРАВЛЕНО: Окно рулетки теперь имеет фиксированные пиксели, но гибкие пропорции */
+        .window {
+            width: 320px;
+            height: 400px;
+            margin: 0 auto 25px;
+            border-radius: 12px;
+            overflow: hidden;
+            background: #111;
+            position: relative;
+            border: 4px solid #3e3e4f;
+            box-sizing: border-box;
+        }
+        .window::before, .window::after {
+            content: "";
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            border: 10px solid transparent;
+            z-index: 10;
+        }
+        .window::before { left: 0; border-left-color: #ffc107; }
+        .window::after { right: 0; border-right-color: #ffc107; }
+
+        .tape {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            transition: transform 3.5s cubic-bezier(0.15, 0.85, 0.35, 1.02);
+            transform: translateY(0px);
+        }
+        
+        /* ИСПРАВЛЕНО: Картинки внутри ленты принудительно занимают всё внутреннее пространство окна */
+        .tape img {
+            width: 100%;
+            height: 392px; /* 400px высоты минус 8px верхних и нижних рамок */
+            object-fit: cover;
+            box-sizing: border-box;
+            display: block;
+            flex-shrink: 0;
+        }
+
+        button {
+            background: linear-gradient(135deg, #ffc107, #ff9800);
+            color: #000;
+            border: none;
+            padding: 15px 40px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 30px;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(255, 152, 0, 0.4);
+            transition: 0.2s;
+            width: 100%;
+        }
+        button:hover { transform: translateY(-2px); box-shadow: 0 7px 20px rgba(255, 152, 0, 0.6); }
+        button:disabled { background: #555; color: #888; cursor: not-allowed; box-shadow: none; transform: none; }
+        
+        .status-text {
+            margin-top: 15px;
+            font-size: 14px;
+            color: #aaa;
+        }
+
+        @media (max-width: 900px) {
+            body {
+                padding: 15px 10px;
+                margin-top: 10px;
+            }
+            .game-container {
+                grid-template-columns: 1fr;
+                gap: 20px;
+                max-width: 100%;
+            }
+            .roulette-box { grid-row: 1; }
+            .team-left { grid-row: 2; }
+            .team-right { grid-row: 3; }
+            .team-box { min-height: auto; padding: 15px; }
+        }
+
+        button {
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .slot details summary {
+            -webkit-tap-highlight-color: transparent;
+            padding: 8px 0;
+        }
+    </style>
+</head>
+<body>
+
+<div class="game-container">
+    <div class="team-box team-left" id="team2-box">
+        <h3>Команда №2 (<span id="count2">0</span>/5)</h3>
+        <div class="team-slots" id="team2-slots"></div>
+    </div>
+
+    <div class="roulette-box">
+        <h2 id="round-title">Рандомайзер</h2>
+        <div class="window">
+            <div class="tape" id="image-tape">
+                <img src="img/main.jpg" alt="Главная">
+            </div>
+        </div>
+        <button id="spin-btn" onclick="startSpinning()">Крутить</button>
+        
+        <!-- ДОБАВЛЕНО: Кнопка сброса команд -->
+        <button id="reset-game-btn" onclick="resetGame()" style="background: #444; color: #fff; margin-top: 20px; padding: 10px 20px; font-size: 14px;">Сбросить команды</button>
+        
+        <div class="status-text" id="status-message">Ход: Команда №1 (Справа)</div>
+    </div>
+
+    <div class="team-box team-right active" id="team1-box">
+        <h3>Команда №1 (<span id="count1">0</span>/5)</h3>
+        <div class="team-slots" id="team1-slots"></div>
+    </div>
+</div>
+
+<script>
+    const TOTAL_IMAGES = 20; 
+
+    // База данных персонажей (Дописываем потихоньку)
+    const CHARACTER_DATA = {
+        1: { name: "Оборотень", desc: "Ван Хельсинг. Ликантроп. Способен легко пробивать каменные стены, швырять огромные предметы. Мгновенно развивает огромную скорость. Обладает мощной регенерацией. Невосприимчив к боли. Обостренное обоняние, слух" },
+        2: { name: "Франкенштейн", desc: "Франкенштейн. Сверхчеловеческая сила. Регенерация и неуязвимость. Бессмертие. Колоссальная выносливость. Высокий интеллект и адаптивность." },
+        3: { name: "Вампир", desc: "Сумерки. Телепатия, чтение мыслей, Выдающаяся скорость, Сверхчеловеческая сила. Обостренные чувства.Неуязвимость и бессмертие. " },
+        4: { name: "Волан-де-Морт", desc: "Гарри поттер. Легилименция-чтение мыслей и воспоминаний. Змеиный язык-Парселтанг. Полет без опоры. Высшая Тёмная магия. Мастер дуэлей и невербальной магии " },
+        5: { name: "Оборотень", desc: "Сумерки. Превращение в волка. Сверхчеловеческая сила. Высокая скорость и выносливость. Исцеление и регенерация. Замедленное старение. Обостренные чувства.  " },
+        6: { name: "Дракула", desc: "Ван Хельсинг. Трансформация в нетопыря. Абсолютное бессмертие. Физическое превосходство. Хождение по поверхностям - стены, потолки. Вампиризм. Психическая связь с потомством. " },
+        7: { name: "Альбус Дамблдор", desc: "Гарри поттер. Беспалочковая и невербальная магия. Легилименция и Окклюменция - чтения мыслей и защита своего сознания. Идеальное заклинание невидимости. Мастерство стихийной, элементальной магии. Высшая Трансфигурация и Чары. Гениальный тактик и ученый. " },
+        8: { name: "Гарри Поттер", desc: "Гарри Поттер. Защита от Тёмных искусств. Парселтанг-змеиный язык. Мастер дуэлей - Обладает молниеносной реакцией и боевым мышлением. Выдающийся ловец. Сопротивление заклятию Империус. Лидерство и тактика. Бессмертие духа. " },
+        9: { name: "Саурон", desc: "Властелин колец. Манипуляция разумом, обман и внушение. Кузнечное мастерство и создание артефактов. Изменение облика Смена формы. Управление стихиями и погодой. Некромантия и колдовство. Сверхчеловеческая физическая мощь и огонь. " },
+        10: { name: "Гэндальф Серый", desc: "Властелин колец. Магия огня и света. Телекинез и энергетические барьеры. Духовное внушение и мудрость. Сверхчеловеческая стойкость и фехтование. Телепатия и проницательность. " },
+        11: { name: "Саруман Белый", desc: "Властелин колец. Чарующий Голос. Ментальное подчинение и порча разума. Управление погодой. Телекинез. Пирокинез. Генетика и селекция. Алхимия и взрывчатые вещества.  " },
+        12: { name: "Хеллбой", desc: "Хеллбой. Правая Рука Рока. Сверхчеловеческая сила и выносливость. Быстро восстанавливается после тяжелых ранений, переломов, огнестрельных ранений. Абсолютный иммунитет к огню. Замедленное старение. Связь с паранормальным. Мастерство владения оружием. " },
+        13: { name: "Ведьмак", desc: "Ведьмак. Сверхчеловеческая сила, скорость, реакция. Видение в темноте. Иммунитет к большинству болезней и ядов. Ускоренная регенерация. Ведьмачьи Знаки - простая магия. Алхимия. Мастерство боя. " },
+        14: { name: "Киборг Т-1000", desc: "Терминатор. Изменение формы - Мимикрия. Создание холодного оружия. Регенерация и неуязвимость. Прохождение сквозь препятствия. Копирование голоса. Сверхчеловеческая сила и скорость. " },
+        15: { name: "Киборг Т-800", desc: "Терминатор. Сверхчеловеческая сила. Искусственный интеллект и процессор. Зрение и анализ - Обладает инфракрасным термальным зрением. Работает от ядерного источника энергии. Маскировка внедрение.эндоскелет из прочного титанового сплава. Киборг полностью невосприимчив к стрелковому оружию малого калибра. " },
+        16: { name: "Киборг T-X", desc: "Терминатор. Встроенное оружие - плазменная пушка. Управление другими машинами - электроникой, компьютерами и транспортными средствами. Изменение внешности. Сверхчеловеческая сила и прочность. Расширенный боевой анализ. " },
+        17: { name: "Робокоп", desc: "Робокоп. Кибернетическая сверхсила. Броня из титана и кевлара. Компьютерное зрение и прицеливание. Слежение и распознавание лиц. Запись и воспроизведение всего, что видит и слышит. " },
+        18: { name: "Нео", desc: "Матрица. Манипуляция кодом Матрицы. Искажение физики и левитация. Сверхчеловеческие рефлексы и боевые искусства. Кинетический барьер и телекинез. Неуязвимость и исцеление. Связь с Источником вне Матрицы. " },
+        19: { name: "Риддик", desc: "Риддик. Хищное ночное зрение. Улучшенные физические показатели. Повышенный болевой порог. Мастер боевых искусств. Искусство скрытности. Гений выживания. Иммунитет к страху. Тактическое мышление. " },
+        20: { name: "Хищник Дэк", desc: "Хищник Планета смерти. Сверхчеловеческая сила и стойкость. Высокая скорость и ловкость. Ускоренная регенерация. Мастер ближнего боя и скрытности. Изобретательность и адаптивность. Высокотехнологичный арсенал." },
+        21: { name: "Вампир", desc: "Сумерки. Телепатия, чтение мыслей, Выдающаяся скорость, Сверхчеловеческая сила. Обостренные чувства.Неуязвимость и бессмертие. " },
+        22: { name: "Вампир", desc: "Сумерки. Телепатия, чтение мыслей, Выдающаяся скорость, Сверхчеловеческая сила. Обостренные чувства.Неуязвимость и бессмертие. " },
+        23: { name: "Вампир", desc: "Сумерки. Телепатия, чтение мыслей, Выдающаяся скорость, Сверхчеловеческая сила. Обостренные чувства.Неуязвимость и бессмертие. " },
+        24: { name: "Вампир", desc: "Сумерки. Телепатия, чтение мыслей, Выдающаяся скорость, Сверхчеловеческая сила. Обостренные чувства.Неуязвимость и бессмертие. " },
+        25: { name: "Вампир", desc: "Сумерки. Телепатия, чтение мыслей, Выдающаяся скорость, Сверхчеловеческая сила. Обостренные чувства.Неуязвимость и бессмертие. " },
+        26: { name: "Вампир", desc: "Сумерки. Телепатия, чтение мыслей, Выдающаяся скорость, Сверхчеловеческая сила. Обостренные чувства.Неуязвимость и бессмертие. " },
+        27: { name: "Вампир", desc: "Сумерки. Телепатия, чтение мыслей, Выдающаяся скорость, Сверхчеловеческая сила. Обостренные чувства.Неуязвимость и бессмертие. " },
+        28: { name: "Вампир", desc: "Сумерки. Телепатия, чтение мыслей, Выдающаяся скорость, Сверхчеловеческая сила. Обостренные чувства.Неуязвимость и бессмертие. " },
+        29: { name: "Вампир", desc: "Сумерки. Телепатия, чтение мыслей, Выдающаяся скорость, Сверхчеловеческая сила. Обостренные чувства.Неуязвимость и бессмертие. " },
+        30: { name: "Вампир", desc: "Сумерки. Телепатия, чтение мыслей, Выдающаяся скорость, Сверхчеловеческая сила. Обостренные чувства.Неуязвимость и бессмертие. " },
+        31: { name: "Вампир", desc: "Сумерки. Телепатия, чтение мыслей, Выдающаяся скорость, Сверхчеловеческая сила. Обостренные чувства.Неуязвимость и бессмертие. " }
+        // и так далее до 40...
+    };
+
+    const tape = document.getElementById('image-tape');
+    const btn = document.getElementById('spin-btn');
+    const statusMsg = document.getElementById('status-message');
+    
+    let availableImages = [];
+    let targetGlobalIndex = 0;
+    let team1 = [];
+    let team2 = [];
+    let currentTurn = 'team1'; 
+
+    // Функция считывает целую высоту картинки (392px), страхуя ПК от багов масштабирования Windows
+    function getActualHeight() {
+        const firstImg = tape.querySelector('img');
+        return firstImg ? firstImg.offsetHeight : 392;
+    }
+
+    // Пересчет позиции ленты на лету, чтобы картинка не уплывала при ручном изменении окна
+    window.addEventListener('resize', () => {
+        tape.style.transition = 'none';
+        tape.style.transform = `translateY(${-(targetGlobalIndex * getActualHeight())}px)`;
+    });
+
+    function resetPool() {
+        availableImages = [];
+        for (let i = 1; i <= TOTAL_IMAGES; i++) {
+            availableImages.push(i);
+        }
+    }
+    resetPool();
+
+    function buildTape() {
+        tape.innerHTML = '<img src="img/main.jpg" alt="Главная">';
+        for (let round = 0; round < 4; round++) {
+            for (let i = 1; i <= TOTAL_IMAGES; i++) {
+                const img = document.createElement('img');
+                img.src = `img/${i}.jpg`;
+                tape.appendChild(img);
+            }
+        }
+    }
+    buildTape();
+
+    function updateVisualTurns() {
+        document.getElementById('team1-box').classList.remove('active');
+        document.getElementById('team2-box').classList.remove('active');
+        
+        if (team1.length >= 5 && team2.length >= 5) {
+            statusMsg.innerText = "Формирование команд завершено!";
+            btn.disabled = true;
+            btn.innerText = "Готово";
+            return;
+        }
+
+        if (currentTurn === 'team1') {
+            document.getElementById('team1-box').classList.add('active');
+            statusMsg.innerText = "Ход: Команда №1 (Справа)";
+        } else {
+            document.getElementById('team2-box').classList.add('active');
+            statusMsg.innerText = "Ход: Команда №2 (Слева)";
+        }
+    }
+
+    function startSpinning() {
+        if (team1.length >= 5 && team2.length >= 5) return;
+
+        btn.disabled = true;
+
+        const finalPoolIndex = Math.floor(Math.random() * availableImages.length);
+        const finalImageNumber = availableImages[finalPoolIndex];
+
+        const currentSrc = tape.getElementsByTagName('img')[targetGlobalIndex || 0]?.getAttribute('src');
+        
+        tape.style.transition = 'none';
+        
+        let resetIndex = 0;
+        if (currentSrc && currentSrc !== 'img/main.jpg') {
+            for (let i = 1; i <= TOTAL_IMAGES; i++) {
+                if (`img/${i}.jpg` === currentSrc) {
+                    resetIndex = i;
+                    break;
+                }
+            }
+        }
+        
+        const imgH = getActualHeight();
+        tape.style.transform = `translateY(${-(resetIndex * imgH)}px)`;
+        targetGlobalIndex = resetIndex;
+
+        setTimeout(() => {
+            tape.style.transition = 'transform 3.5s cubic-bezier(0.15, 0.85, 0.35, 1.02)';
+            
+            const targetRound = 3; 
+            targetGlobalIndex = ((targetRound - 1) * TOTAL_IMAGES) + finalImageNumber;
+
+            tape.style.transform = `translateY(${-(targetGlobalIndex * getActualHeight())}px)`;
+            
+            availableImages.splice(finalPoolIndex, 1);
+        }, 50);
+
+        setTimeout(() => {
+            if (currentTurn === 'team1') {
+                team1.push(finalImageNumber);
+                addSlotToUI('team1-slots', finalImageNumber);
+                document.getElementById('count1').innerText = team1.length;
+                
+                if (team2.length < 5) {
+                    currentTurn = 'team2';
+                }
+            } else {
+                team2.push(finalImageNumber);
+                addSlotToUI('team2-slots', finalImageNumber);
+                document.getElementById('count2').innerText = team2.length;
+                
+                if (team1.length < 5) {
+                    currentTurn = 'team1';
+                }
+            }
+
+            updateVisualTurns();
+
+            if (!(team1.length >= 5 && team2.length >= 5)) {
+                btn.disabled = false;
+            }
+
+            if (availableImages.length === 0 && !(team1.length >= 5 && team2.length >= 5)) {
+                alert("Все картинки показаны! Начинаем новый круг.");
+                resetPool();
+            }
+        }, 3600);
+    }
+
+    function addSlotToUI(targetId, imgNumber) {
+        const container = document.getElementById(targetId);
+        const slot = document.createElement('div');
+        slot.className = 'slot';
+        
+        const charName = CHARACTER_DATA[imgNumber]?.name || `Игрок #${imgNumber}`;
+        const charDesc = CHARACTER_DATA[imgNumber]?.desc || "Описание пока не добавлено.";
+
+        slot.innerHTML = `
+            <img src="img/${imgNumber}.jpg" alt="Участник">
+            <details>
+                <summary>${charName}</summary>
+                <p>${charDesc}</p>
+            </details>
+        `;
+        container.appendChild(slot);
+    }
+	// Функция для полного сброса игры и очистки команд
+function resetGame() {
+    // 1. Очищаем массивы команд в памяти
+    team1 = [];
+    team2 = [];
+    currentTurn = 'team1';
+    
+    // 2. Обнуляем счетчики на экране
+    document.getElementById('count1').innerText = "0";
+    document.getElementById('count2').innerText = "0";
+    
+    // 3. Полностью очищаем списки игроков (удаляем плашки)
+    document.getElementById('team1-slots').innerHTML = "";
+    document.getElementById('team2-slots').innerHTML = "";
+    
+    // 4. Возвращаем пул доступных картинок в исходное состояние
+    resetPool();
+    
+    // 5. Пересобираем ленту заново
+    buildTape();
+    
+    // 6. Сбрасываем положение рулетки на самую верхнюю позицию (к main.jpg)
+    targetGlobalIndex = 0;
+    tape.style.transition = 'none';
+    tape.style.transform = 'translateY(0px)';
+    
+    // 7. Возвращаем кнопку "Крутить" к жизни и обновляем надписи
+    btn.disabled = false;
+    btn.innerText = "Крутить";
+    
+    // 8. Обновляем подсветку активных ходов
+    updateVisualTurns();
+}
+</script>
+</body>
+</html>
